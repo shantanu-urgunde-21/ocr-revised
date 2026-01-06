@@ -27,40 +27,46 @@ def health():
 
 @app.post("/ocr")
 async def ocr(files: List[UploadFile] = File(...)):
-    # multiple images
     results = []
-    all_lines = []
+    concatenated_lines = []
 
     for idx, file in enumerate(files):
         try:
             contents = await file.read()
-            result = service.process_bytes(  # type: ignore
-                contents, file.filename
-            )  # don't worry about this line (it's correct)
 
-            results.append(
-                {
-                    "file_index": idx,
-                    "filename": result["filename"],
-                    "text": result["text"],
-                    "lines": result["lines"],
-                }
-            )
-            all_lines.extend(result["lines"])
-        except Exception as e:
-            results.append(
-                {
-                    "file_index": idx,
-                    "filename": file.filename,
-                    "text": "",
-                    "lines": [],
-                }
-            )
+            # {
+            #   "filename": str,
+            #   "text": str,
+            #   "lines": List[str]
+            # }
+
+            result = service.process_bytes(contents, file.filename)  # type: ignore
+
+            file_result = {
+                "file_index": idx,
+                "filename": result["filename"],
+                "text": result["text"],
+                "lines": result["lines"],
+            }
+
+        except Exception:
+            file_result = {
+                "file_index": idx,
+                "filename": file.filename,
+                "text": "",
+                "lines": [],
+            }
+
+        results.append(file_result)
+        concatenated_lines.extend(file_result["lines"])
 
     return {
         "num_files": len(files),
         "results": results,
-        "concatenated": {"text": "\n".join(all_lines), "lines": all_lines},
+        "concatenated": {
+            "text": "\n".join(concatenated_lines),
+            "lines": concatenated_lines,
+        },
     }
 
 
