@@ -1,6 +1,6 @@
 # Run: uvicorn ocr_api:app --host 0.0.0.0 --port 8000
 
-from fastapi import FastAPI, File, UploadFile
+from fastapi import FastAPI, File, UploadFile, HTTPException
 from typing import List
 from ocr_service import OCRService
 
@@ -26,21 +26,34 @@ def health():
 
 
 @app.post("/ocr")
-async def ocr(files: List[UploadFile] = File(...)):
+async def ocr(file: UploadFile = File(...)):
+    try:
+        contents = await file.read()
+        if not contents:
+            raise HTTPException(status_code=400, detail="Empty file")
+
+        result = service.process_bytes(contents, file.filename)
+        return result
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/ocr/multiple")
+async def ocr_multiple(files: List[UploadFile] = File(...)):
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided")
+
     results = []
     concatenated_lines = []
 
     for idx, file in enumerate(files):
         try:
             contents = await file.read()
+            if not contents:
+                raise ValueError("Empty file")
 
-            # {
-            #   "filename": str,
-            #   "text": str,
-            #   "lines": List[str]
-            # }
-
-            result = service.process_bytes(contents, file.filename)  # type: ignore
+            result = service.process_bytes(contents, file.filename)
 
             file_result = {
                 "file_index": idx,
@@ -48,17 +61,18 @@ async def ocr(files: List[UploadFile] = File(...)):
                 "text": result["text"],
                 "lines": result["lines"],
             }
+            concatenated_lines.extend(result["lines"])
 
-        except Exception:
+        except Exception as e:
             file_result = {
                 "file_index": idx,
                 "filename": file.filename,
                 "text": "",
                 "lines": [],
+                "error": str(e),
             }
 
         results.append(file_result)
-        concatenated_lines.extend(file_result["lines"])
 
     return {
         "num_files": len(files),
@@ -68,11 +82,3 @@ async def ocr(files: List[UploadFile] = File(...)):
             "lines": concatenated_lines,
         },
     }
-
-
-@app.post("/ocr/single")
-async def ocr_single(file: UploadFile = File(...)):
-    # single image
-    contents = await file.read()
-    result = service.process_bytes(contents, file.filename)  # type: ignore
-    return result
