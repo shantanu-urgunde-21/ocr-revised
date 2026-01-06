@@ -26,34 +26,27 @@ def health():
 
 
 @app.post("/ocr")
-async def ocr(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        if not contents:
-            raise HTTPException(status_code=400, detail="Empty file")
+async def ocr(file: List[UploadFile] = File(...)):
+    """
+    Accepts one or multiple files under field name 'file' and returns:
+    - structured OCR output per file
+    - a concatenated text across all files
+    """
+    files = file  # support single form field named 'file' (may contain multiple files)
 
-        result = service.process_bytes(contents, file.filename)
-        return result
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/ocr/multiple")
-async def ocr_multiple(files: List[UploadFile] = File(...)):
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
     results = []
     concatenated_lines = []
 
-    for idx, file in enumerate(files):
+    for idx, f in enumerate(files):
         try:
-            contents = await file.read()
+            contents = await f.read()
             if not contents:
                 raise ValueError("Empty file")
 
-            result = service.process_bytes(contents, file.filename)
+            result = service.process_bytes(contents, f.filename)  # type: ignore
 
             file_result = {
                 "file_index": idx,
@@ -66,7 +59,7 @@ async def ocr_multiple(files: List[UploadFile] = File(...)):
         except Exception as e:
             file_result = {
                 "file_index": idx,
-                "filename": file.filename,
+                "filename": f.filename,
                 "text": "",
                 "lines": [],
                 "error": str(e),
