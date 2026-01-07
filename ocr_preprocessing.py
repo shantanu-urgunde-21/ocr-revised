@@ -17,25 +17,28 @@ def load_image(image_path, target_width=2000):
 
 
 def deskew(img):
-    _, binary = cv2.threshold(
-        img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU
-    )  # --- IGNORE ---
-    coords = np.column_stack(np.where(binary > 0))
+    _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)  #
 
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 5))
+    dilated = cv2.dilate(binary, kernel, iterations=1)
+
+    coords = np.column_stack(np.where(dilated > 0))
     if len(coords) == 0:
         return img
 
-    angle = cv2.minAreaRect(coords)[-1]
+    rect = cv2.minAreaRect(coords)
+    angle = rect[-1]
+
     if angle < -45:
         angle = -(90 + angle)
     else:
-        angle = -angle  # yes, it's negative
+        angle = -angle
 
-    if abs(angle) > 0.5:
+    if 0.5 < abs(angle) < 15:
         h, w = img.shape
         center = (w // 2, h // 2)
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
-        img = cv2.warpAffine(img, M, (w, h), borderMode=cv2.BORDER_REPLICATE)
+        img = cv2.warpAffine(img, M, (w, h), borderMode=cv2.BORDER_REPLICATE)  #
 
     return img
 
