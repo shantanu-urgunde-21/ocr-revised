@@ -17,6 +17,7 @@ COPY ocr_preprocessing.py .
 COPY ocr_model.py .
 COPY ocr_service.py .
 COPY ocr_api.py .
+COPY ocr_debug_original.py .
 
 EXPOSE 8000
 
